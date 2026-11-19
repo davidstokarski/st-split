@@ -9,8 +9,10 @@ namespace stsplit
     - Audio Units come straight from the system's component registry (no plug-in is loaded to list them), so the
       list is complete and instant.
     - VST3s are scanned on a background thread with JUCE's PluginDirectoryScanner (incremental: only new or changed
-      bundles are opened; moduleinfo.json when present). A crash during a scan is remembered in a "dead man's pedal"
-      file and that bundle is skipped next time. Results are cached in
+      bundles are looked at), but every bundle is opened by the "ST Split Scanner" helper in its own process
+      (<plug-in bundle>/Contents/Helpers). A plug-in that crashes or hangs while being opened only takes the helper
+      down and is skipped from then on; nothing unknown is ever loaded into the DAW just to list it. Without the
+      helper there is no VST3 scan at all (never an in-process fallback). Results are cached in
       ~/Library/Application Support/ST Audio/ST Split/.
     - ST Split itself is never offered (no recursion).
 
@@ -37,6 +39,17 @@ public:
     bool needsInitialRefresh() const noexcept { return ! refreshedOnce; }
 
     bool isScanning() const noexcept { return isThreadRunning(); }
+    /** False when the scanner helper is missing (VST3s already in the cache are still offered). */
+    bool canScanVst3() const { return getScannerExecutable().existsAsFile(); }
+
+    /** The helper that opens VST3 bundles out of process: next to the plug-in binary, or the override. */
+    static juce::File getScannerExecutable();
+    /** For tests and tools whose executable isn't inside an ST Split bundle. */
+    static void setScannerExecutable (const juce::File&);
+    /** The KnownPluginList scanner that opens VST3 bundles in the helper process (the catalogue installs one). */
+    static std::unique_ptr<juce::KnownPluginList::CustomScanner> makeOutOfProcessScanner();
+    /** Seconds a bundle may take to open before the helper is killed and the bundle skipped. */
+    static constexpr int scanTimeoutSeconds = 30;
     /** Name of the bundle being scanned (any thread). */
     juce::String getScanProgress() const;
     /** Bundles skipped because they crashed or failed while scanning. */
@@ -72,7 +85,7 @@ private:
     void loadSettings();
     void saveSettings() const;
     juce::File vst3CacheFile() const    { return getDataDirectory().getChildFile ("VST3 Plug-ins.xml"); }
-    juce::File deadMansPedalFile() const { return getDataDirectory().getChildFile ("VST3 Scan In Progress.txt"); }
+    juce::File deadMansPedalFile() const { return getDataDirectory().getChildFile ("VST3 Scan Pending.txt"); }
     juce::File settingsFile() const     { return getDataDirectory().getChildFile ("Settings.xml"); }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginCatalog)

@@ -11,3 +11,7 @@ target_compile_definitions(StSplitPluginTests PRIVATE $<TARGET_PROPERTY:STSplit,
 if(APPLE)
     target_link_libraries(StSplitPluginTests PRIVATE "-framework AudioToolbox" "-framework CoreAudioKit")
 endif()
+add_dependencies(StSplitPluginTests STSplitScanner)
+# The helper as the plug-in finds it: inside the built AU bundle (Contents/Helpers), not the build tree.
+add_dependencies(StSplitPluginTests STSplit_AU)
+target_compile_definitions(StSplitPluginTests PRIVATE STSPLIT_AU_BUNDLE="$<TARGET_BUNDLE_DIR:STSplit_AU>")

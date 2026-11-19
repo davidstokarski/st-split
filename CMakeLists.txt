@@ -32,6 +32,10 @@ file(GLOB_RECURSE STSPLIT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/Source/*.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/Source/*.h")
 
+# JUCE's sign + copy-to-~/Library step is added below, after the scanner helper has been embedded in the bundles.
+set(STSPLIT_COPY_AFTER_BUILD ${ST_COPY_AFTER_BUILD})
+set(ST_COPY_AFTER_BUILD OFF)
+
 st_add_plugin(STSplit
     PRODUCT_NAME  "ST Split"
     PLUGIN_CODE   Stsp
@@ -51,6 +55,37 @@ target_compile_definitions(STSplit PUBLIC
 
 if(APPLE)
     target_link_libraries(STSplit PRIVATE "-framework AudioToolbox" "-framework CoreAudioKit")
+endif()
+
+# ---------------------------------------------------------------------------
+# VST3 scanner helper. Listing a VST3 means loading it; doing that inside the DAW lets one broken plug-in crash
+# the DAW. ST Split runs this helper (one process per bundle) instead, from <bundle>/Contents/Helpers.
+# Not built with the hardened runtime: it must be able to load any third-party plug-in.
+# ---------------------------------------------------------------------------
+juce_add_console_app(STSplitScanner PRODUCT_NAME "ST Split Scanner")
+set_target_properties(STSplitScanner PROPERTIES OUTPUT_NAME "ST Split Scanner")   # the name PluginCatalog looks for
+target_sources(STSplitScanner PRIVATE scanner/Main.cpp)
+target_compile_features(STSplitScanner PRIVATE cxx_std_20)
+target_compile_definitions(STSplitScanner PRIVATE
+    JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_AU=0 JUCE_PLUGINHOST_VST=0 JUCE_PLUGINHOST_LV2=0 JUCE_PLUGINHOST_LADSPA=0
+    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=0)
+target_link_libraries(STSplitScanner
+    PRIVATE juce::juce_audio_processors_headless
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+
+foreach(format AU VST3 Standalone)
+    if(TARGET STSplit_${format})
+        add_dependencies(STSplit_${format} STSplitScanner)
+        add_custom_command(TARGET STSplit_${format} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "$<TARGET_BUNDLE_DIR:STSplit_${format}>/Contents/Helpers"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_DIR:STSplit_${format}>/Contents/Helpers"
+            COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:STSplitScanner>" "$<TARGET_BUNDLE_DIR:STSplit_${format}>/Contents/Helpers/"
+            VERBATIM)
+    endif()
+endforeach()
+
+if(STSPLIT_COPY_AFTER_BUILD)
+    juce_enable_copy_plugin_step(STSplit)   # re-signs the bundles (the helper changed them), then installs
 endif()
 
 option(STSPLIT_BUILD_TESTS "Build the whole-plugin test tool" OFF)

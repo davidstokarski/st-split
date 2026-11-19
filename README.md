@@ -22,7 +22,8 @@ Split a track at any frequency and run **your own plug-ins** on each side: a com
 - A plug-in that isn't installed on this machine stays in its slot (marked "Not installed") with its settings
   kept, so the session reopens correctly where it is installed.
 - Plug-in list: Audio Units are read from the system registry (instant, nothing is loaded); VST3s are scanned in
-  the background, incrementally, and a bundle that crashes the scan is skipped next time. Format preference
+  the background, incrementally, each one in a separate helper process (`ST Split Scanner`, inside the plug-in
+  bundle): a plug-in that crashes or hangs while being listed is skipped and never affects your DAW. Format preference
   (AU / VST3 / both) and Rescan are in the gear menu. Cache: `~/Library/Application Support/ST Audio/ST Split/`.
 
 ## Build

@@ -21,7 +21,10 @@ Plugin-specific notes:
   swap the snapshot under that lock and destroy removed instances only afterwards. Never call into a hosted
   instance from the audio thread outside `AudioScope`, and never block the audio thread on the lock.
 - Plug-in list: `Source/host/PluginCatalog.*` (process-wide `SharedResourcePointer`): AUs from the component
-  registry (`AudioUnitList.cpp`, no instantiation), VST3 background scan with a dead man's pedal. ST Split never
+  registry (`AudioUnitList.cpp`, no instantiation); VST3s are opened only by the `ST Split Scanner` helper
+  (`scanner/Main.cpp`, embedded in each bundle's `Contents/Helpers` by CMake before JUCE re-signs and installs),
+  one process per bundle, so a plug-in that crashes while being listed can't take the DAW down. Never add an
+  in-process fallback: that crashed Logic (a VST3 crashed in its initialisers on our scan thread). ST Split never
   lists itself.
 - Look: Logic Pro's dark appearance. Theme tokens are set in the processor constructor; `Source/ui/Style.*` turns them
   into surfaces (toolbar strips, panels, wells, flat buttons, M / S toggles, meters). Use those instead of the shell's

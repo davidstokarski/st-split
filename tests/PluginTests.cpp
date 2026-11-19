@@ -215,6 +215,63 @@ static int runTests()
     check (! selfListed, "ST Split never offers itself");
     if (! (delay && dist && limiter && eq)) { std::cout << failures << " FAILURES\n"; return 1; }
 
+    // ---- VST3 scanning happens out of process: a plug-in that crashes while being opened can't take us down.
+    std::cout << "Out-of-process VST3 scan\n";
+    {
+        // Same lookup as the plug-in: <bundle>/Contents/MacOS/<binary> -> <bundle>/Contents/Helpers/ST Split Scanner
+        const auto bundledHelper = juce::File (STSPLIT_AU_BUNDLE).getChildFile ("Contents/MacOS/ST Split")
+                                       .getParentDirectory().getParentDirectory().getChildFile ("Helpers").getChildFile ("ST Split Scanner");
+        PluginCatalog::setScannerExecutable (bundledHelper);
+        check (bundledHelper.existsAsFile(), "scanner helper embedded in the AU bundle under the name the plug-in looks for");
+
+        juce::AudioPluginFormat* vst3 = nullptr;
+        juce::SharedResourcePointer<PluginCatalog> catalog;
+        for (auto* f : catalog->getFormatManager().getFormats())
+            if (f->getName() == "VST3") vst3 = f;
+
+        auto scan = [&] (const juce::File& bundle, juce::KnownPluginList& list)
+        {
+            juce::OwnedArray<juce::PluginDescription> found;
+            list.scanAndAddFile (bundle.getFullPathName(), false, found, *vst3);
+            return (int) found.size();
+        };
+
+        const auto stSat = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Library/Audio/Plug-Ins/VST3/ST Sat.vst3");
+        if (stSat.isDirectory())
+        {
+            juce::KnownPluginList list;
+            list.setCustomScanner (PluginCatalog::makeOutOfProcessScanner());
+            check (scan (stSat, list) == 1 && list.getBlacklistedFiles().isEmpty(), "helper lists ST Sat.vst3");
+        }
+
+        // The bundle that crashed Logic when it was opened inside the host: now it's opened in the helper only.
+        const juce::File innerPitch ("/Library/Audio/Plug-Ins/VST3/Auburn Sounds Inner Pitch.vst3");
+        if (innerPitch.isDirectory())
+        {
+            juce::KnownPluginList list;
+            list.setCustomScanner (PluginCatalog::makeOutOfProcessScanner());
+            const int n = scan (innerPitch, list);
+            check (true, "Inner Pitch scanned out of process without affecting this process ("
+                         + (n > 0 ? juce::String (n) + " found" : juce::String ("skipped")) + ")");
+        }
+
+        // A helper that crashes: the bundle is skipped (blacklisted), nothing else happens.
+        {
+            auto crasher = juce::File::createTempFile (".sh");
+            crasher.replaceWithText ("#!/bin/sh\nkill -SEGV $$\n");
+            crasher.setExecutePermission (true);
+            PluginCatalog::setScannerExecutable (crasher);
+            juce::KnownPluginList list;
+            list.setCustomScanner (PluginCatalog::makeOutOfProcessScanner());
+            const auto anyBundle = stSat.isDirectory() ? stSat : innerPitch;
+            if (anyBundle.isDirectory())
+                check (scan (anyBundle, list) == 0 && list.getBlacklistedFiles().contains (anyBundle.getFullPathName()),
+                       "a crash in the helper skips that bundle");
+            crasher.deleteFile();
+            PluginCatalog::setScannerExecutable (bundledHelper);
+        }
+    }
+
     std::cout << "Hosting\n";
     auto proc = std::make_unique<StSplitProcessor>();
     auto& p = *proc;

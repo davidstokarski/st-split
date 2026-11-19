@@ -3,10 +3,86 @@
 namespace stsplit
 {
 
+namespace
+{
+    juce::File& scannerOverride()
+    {
+        static juce::File f;
+        return f;
+    }
+
+    /** Opens each VST3 bundle in the "ST Split Scanner" helper process (see scanner/Main.cpp). */
+    struct OutOfProcessScanner : juce::KnownPluginList::CustomScanner
+    {
+        bool findPluginTypesFor (juce::AudioPluginFormat& format, juce::OwnedArray<juce::PluginDescription>& result,
+                                 const juce::String& fileOrIdentifier) override
+        {
+            const auto helper = PluginCatalog::getScannerExecutable();
+            if (format.getName() != "VST3" || ! helper.existsAsFile())
+                return true;   // nothing found, but don't mark the bundle as broken
+
+            juce::TemporaryFile out (".xml");
+            juce::ChildProcess child;
+            if (! child.start (juce::StringArray { helper.getFullPathName(), "--vst3", fileOrIdentifier,
+                                                   "--out", out.getFile().getFullPathName() }, 0))
+                return true;   // the host doesn't let us start processes: no VST3 scan, nothing blacklisted
+
+            const auto started = juce::Time::getMillisecondCounter();
+            while (child.isRunning())
+            {
+                if (shouldExit())
+                {
+                    child.kill();
+                    return true;   // cancelled: scanned again next time
+                }
+                if (juce::Time::getMillisecondCounter() - started > (juce::uint32) PluginCatalog::scanTimeoutSeconds * 1000u)
+                {
+                    child.kill();
+                    return false;  // hung: skip it from now on
+                }
+                juce::Thread::sleep (15);
+            }
+
+            const auto exitCode = child.getExitCode();
+            if (exitCode != 0 && exitCode != 2)
+                return false;      // crashed (or couldn't report): skip it from now on
+
+            if (auto xml = juce::XmlDocument::parse (out.getFile()))
+                for (auto* e : xml->getChildIterator())
+                {
+                    auto d = std::make_unique<juce::PluginDescription>();
+                    if (d->loadFromXml (*e)) result.add (d.release());
+                }
+            return true;
+        }
+    };
+}
+
+juce::File PluginCatalog::getScannerExecutable()
+{
+    if (scannerOverride() != juce::File()) return scannerOverride();
+    // <bundle>/Contents/MacOS/<binary>  ->  <bundle>/Contents/Helpers/ST Split Scanner
+    return juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+               .getParentDirectory().getParentDirectory().getChildFile ("Helpers").getChildFile ("ST Split Scanner");
+}
+
+std::unique_ptr<juce::KnownPluginList::CustomScanner> PluginCatalog::makeOutOfProcessScanner()
+{
+    return std::make_unique<OutOfProcessScanner>();
+}
+
+void PluginCatalog::setScannerExecutable (const juce::File& f)
+{
+    scannerOverride() = f;
+}
+
 PluginCatalog::PluginCatalog() : juce::Thread ("ST Split plug-in scan")
 {
     juce::addDefaultFormatsToManager (formats);
     getDataDirectory().createDirectory();
+    // Left by builds that scanned inside the host (it may name a bundle that only crashed because of that).
+    getDataDirectory().getChildFile ("VST3 Scan In Progress.txt").deleteFile();
+    vst3List.setCustomScanner (makeOutOfProcessScanner());
 
     if (auto xml = juce::XmlDocument::parse (vst3CacheFile()))
         vst3List.recreateFromXml (*xml);
@@ -105,7 +181,7 @@ void PluginCatalog::run()
     juce::AudioPluginFormat* vst3 = nullptr;
     for (auto* f : formats.getFormats())
         if (f->getName() == "VST3") vst3 = f;
-    if (vst3 == nullptr) return;
+    if (vst3 == nullptr || ! canScanVst3()) return;   // never open VST3s inside the host
 
     {
         // Incremental: unchanged bundles already in the list are not opened again.

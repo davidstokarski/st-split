@@ -51,6 +51,8 @@ void addPluginItems (juce::PopupMenu& menu, PluginCatalog& catalog, std::functio
         menu.addItem (juce::PopupMenu::Item ("Scanning VST3" + (progress.isNotEmpty() ? ": " + progress : juce::String()))
                           .setEnabled (false));
     }
+    else if (! catalog.canScanVst3())
+        menu.addItem (juce::PopupMenu::Item ("VST3 scanning unavailable (ST Split Scanner missing)").setEnabled (false));
     else
         menu.addItem (juce::PopupMenu::Item ("Rescan plug-ins").setAction ([] { juce::SharedResourcePointer<PluginCatalog> c; c->rescanAll(); }));
 }
