@@ -1,5 +1,5 @@
 #pragma once
-#include "../PluginProcessor.h"
+#include "Style.h"
 
 namespace stsplit
 {
@@ -33,7 +33,7 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
-    static constexpr float handleTop = 112.0f, handleBottom = 286.0f;
+    static constexpr float headerHeight = 24.0f, handleTop = 60.0f, handleBottom = 196.0f;
 
 private:
     StSplitProcessor& proc;
@@ -59,7 +59,7 @@ private:
     std::unique_ptr<st::FrameClock> clock;
 
     static constexpr float minHz = 20.0f, maxHz = 20000.0f;
-    static constexpr float levelMin = -36.0f, levelMax = 24.0f;
+    static constexpr float levelMin = -24.0f, levelMax = 24.0f;
     float xForHz (float hz) const noexcept;
     float hzForX (float x) const noexcept;
     float yForLevel (float db) const noexcept;
@@ -76,6 +76,7 @@ private:
     void chainsChanged() override;
     void showBandMenu (int band);
 
+    void drawGrid (juce::Graphics&);
     void drawColumns (juce::Graphics&);
     void drawResponses (juce::Graphics&);
     void drawSpectrum (juce::Graphics&);

@@ -12,7 +12,7 @@ juce::String getBandName (int band, int numBands)
 
 juce::Colour getBandColour (int band, int numBands)
 {
-    const juce::Colour low (0xffffa04a), high (0xff55c6e6);
+    const juce::Colour low (0xfff0a23c), high (0xff3ec3d8);   // Logic region amber / cyan
     if (numBands <= 1) return low;
     return low.interpolatedWith (high, (float) band / (float) (numBands - 1));
 }
@@ -36,7 +36,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     {
         const auto name = getBandName (b);
         auto group = std::make_unique<juce::AudioProcessorParameterGroup> ("band" + juce::String (b + 1), name, "|");
-        group->addChild (makeFloat (ids::band (b, "level"), name + " Level", linear (-36.0f, 24.0f, 0.01f), 0.0f, dbAttributes()));
+        group->addChild (makeFloat (ids::band (b, "level"), name + " Level", linear (-24.0f, 24.0f, 0.01f), 0.0f, dbAttributes()));
         group->addChild (makeFloat (ids::band (b, "mix"), name + " Mix", linear (0.0f, 100.0f, 0.01f), 100.0f, percentAttributes()));
         group->addChild (makeBool (ids::band (b, "mute"), name + " Mute", false));
         group->addChild (makeBool (ids::band (b, "solo"), name + " Solo", false));

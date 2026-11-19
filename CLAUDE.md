@@ -23,6 +23,9 @@ Plugin-specific notes:
 - Plug-in list: `Source/host/PluginCatalog.*` (process-wide `SharedResourcePointer`): AUs from the component
   registry (`AudioUnitList.cpp`, no instantiation), VST3 background scan with a dead man's pedal. ST Split never
   lists itself.
+- Look: Logic Pro's dark appearance. Theme tokens are set in the processor constructor; `Source/ui/Style.*` turns them
+  into surfaces (toolbar strips, panels, wells, flat buttons, M / S toggles, meters). Use those instead of the shell's
+  warm hardware helpers (`paint::greyButton`, `pillHandle`, `tray`), and keep new UI flat, neutral and hairline-edged.
 - UI: `Source/ui/SplitDisplay.*` (display), `Source/ui/BandRack.*` (rack + slot rows, drag & drop between bands),
   `Source/ui/PluginWindow.*` (hosted editors; the editor closes them on `slotRemoved` before instances die),
   `Source/ui/PluginMenu.*` (native plug-in menu), `Source/ui/Footer.*`, `Source/PluginEditor.*`.

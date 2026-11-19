@@ -12,7 +12,7 @@ public:
     ~StSplitEditor() override;
 
     static constexpr int designWidth = 1040, designHeight = 720;
-    static constexpr int displayHeight = 372, rackY = 376, rackHeight = 300, footerHeight = 40;
+    static constexpr int margin = 10, displayY = 52, displayHeight = 300, rackY = 362, rackHeight = 314, footerHeight = 36;
 
     /** Opens (or brings to front) the window of a hosted plug-in. */
     void openPluginWindow (const juce::String& uid);
@@ -30,6 +30,7 @@ private:
     int selectedBand = 0;
 
     void layout (juce::Rectangle<int> body) override;
+    void paintBackground (juce::Graphics&, juce::Rectangle<int>) override;
     void updateOpenEditors();
     void slotRemoved (const juce::String& uid) override { closePluginWindow (uid); }
     void chainsChanged() override { updateOpenEditors(); }

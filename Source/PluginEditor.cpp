@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "ui/PluginMenu.h"
+#include "ui/Style.h"
 
 using namespace stsplit;
 
@@ -122,13 +123,22 @@ void StSplitEditor::updateOpenEditors()
     for (auto& r : racks) r->setOpenEditors (open);
 }
 
+void StSplitEditor::paintBackground (juce::Graphics& g, juce::Rectangle<int> area)
+{
+    // Flat Logic-style window: content background with a toolbar strip under the header.
+    const auto& t = st::Theme::get();
+    g.setColour (t.bg1);
+    g.fillRect (area);
+    style::strip (g, juce::Rectangle<float> (0.0f, 0.0f, (float) designWidth, (float) headerHeight), true);
+}
+
 void StSplitEditor::layout (juce::Rectangle<int>)
 {
     auto all = getContent().getLocalBounds();
-    display.setBounds (all.withHeight (displayHeight));
+    display.setBounds (margin, displayY, designWidth - 2 * margin, displayHeight);
     footer.setBounds (all.removeFromBottom (footerHeight));
 
-    const int gap = 12, margin = 12;
+    const int gap = 10;
     const int w = (designWidth - 2 * margin - (kMaxBands - 1) * gap) / kMaxBands;
     for (int b = 0; b < kMaxBands; ++b)
         racks[(size_t) b]->setBounds (margin + b * (w + gap), rackY, w, rackHeight);
