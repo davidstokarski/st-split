@@ -43,6 +43,7 @@ StSplitEditor::StSplitEditor (StSplitProcessor& p)
     header.setBufferedToImage (true);
 
     display.onBandSelected = [this] (int b) { selectBand (b); };
+    display.onFrame = [this] (double dt) { placeRacks (dt); };
     display.onAddPluginRequested = [this] (int b)
     {
         selectBand (b);
@@ -125,21 +126,40 @@ void StSplitEditor::updateOpenEditors()
 
 void StSplitEditor::paintBackground (juce::Graphics& g, juce::Rectangle<int> area)
 {
-    // Flat Logic-style window: content background with a toolbar strip under the header.
-    const auto& t = st::Theme::get();
-    g.setColour (t.bg1);
-    g.fillRect (area);
-    style::strip (g, juce::Rectangle<float> (0.0f, 0.0f, (float) designWidth, (float) headerHeight), true);
+    // static: render once per physical scale, blit afterwards (it sits behind everything that animates)
+    const float pixelScale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    const auto full = getContent().getLocalBounds();
+    if (backdrop.isNull() || std::abs (pixelScale - backdropScale) > 0.01f)
+    {
+        backdropScale = pixelScale;
+        backdrop = juce::Image (juce::Image::RGB, juce::roundToInt ((float) full.getWidth() * pixelScale),
+                                juce::roundToInt ((float) full.getHeight() * pixelScale), false);
+        juce::Graphics bg (backdrop);
+        bg.addTransform (juce::AffineTransform::scale (pixelScale));
+        style::paintBackdrop (bg, full.toFloat());
+    }
+    g.drawImage (backdrop, area.toFloat(), juce::RectanglePlacement::stretchToFit);
+}
+
+void StSplitEditor::placeRacks (double dt)
+{
+    // Both band panels sit on a common baseline above the footer and grow upwards with their plug-in count.
+    const int w = (designWidth - 2 * panelMargin - (kMaxBands - 1) * panelGap) / kMaxBands;
+    for (int b = 0; b < kMaxBands; ++b)
+    {
+        auto& h = rackHeight[(size_t) b];
+        h.setTarget ((float) racks[(size_t) b]->getPreferredHeight());
+        if (dt <= 0.0) h.snap (h.target);
+        else h.tick (dt, 16.0f);
+        const int height = juce::roundToInt (h.current);
+        racks[(size_t) b]->setBounds (panelMargin + b * (w + panelGap), panelsBottom - height, w, height);
+    }
 }
 
 void StSplitEditor::layout (juce::Rectangle<int>)
 {
     auto all = getContent().getLocalBounds();
-    display.setBounds (margin, displayY, designWidth - 2 * margin, displayHeight);
+    display.setBounds (all.withHeight (displayHeight));
     footer.setBounds (all.removeFromBottom (footerHeight));
-
-    const int gap = 10;
-    const int w = (designWidth - 2 * margin - (kMaxBands - 1) * gap) / kMaxBands;
-    for (int b = 0; b < kMaxBands; ++b)
-        racks[(size_t) b]->setBounds (margin + b * (w + gap), rackY, w, rackHeight);
+    placeRacks (0.0);
 }

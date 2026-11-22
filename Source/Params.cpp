@@ -12,7 +12,7 @@ juce::String getBandName (int band, int numBands)
 
 juce::Colour getBandColour (int band, int numBands)
 {
-    const juce::Colour low (0xfff0a23c), high (0xff3ec3d8);   // Logic region amber / cyan
+    const juce::Colour low (0xfff0a23c), high (0xff3ec3d8);   // amber low, cyan high
     if (numBands <= 1) return low;
     return low.interpolatedWith (high, (float) band / (float) (numBands - 1));
 }

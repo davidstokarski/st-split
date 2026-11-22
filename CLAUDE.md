@@ -26,9 +26,11 @@ Plugin-specific notes:
   one process per bundle, so a plug-in that crashes while being listed can't take the DAW down. Never add an
   in-process fallback: that crashed Logic (a VST3 crashed in its initialisers on our scan thread). ST Split never
   lists itself.
-- Look: Logic Pro's dark appearance. Theme tokens are set in the processor constructor; `Source/ui/Style.*` turns them
-  into surfaces (toolbar strips, panels, wells, flat buttons, M / S toggles, meters). Use those instead of the shell's
-  warm hardware helpers (`paint::greyButton`, `pillHandle`, `tray`), and keep new UI flat, neutral and hairline-edged.
+- Look: the ST family's (ST Sat / ST EQ / ST DC): full-window display with the selected band lit in its colour,
+  Sat's dashed split line + tent grip and pill handles, glass band bars with grey buttons on their top edge, matte
+  knobs with a ringed hero (Level, band colour), the footer tray. ST Split's identity is a cool slate near-black
+  with amber (low) and cyan (high) light pools: tokens in `Source/ui/Style.cpp::applyTheme`, backdrop / tray / glass
+  bar in `paintBackdrop` / `paintTray` / `paintGlassBar`. Compare new UI against the siblings' screenshots.
 - UI: `Source/ui/SplitDisplay.*` (display), `Source/ui/BandRack.*` (rack + slot rows, drag & drop between bands),
   `Source/ui/PluginWindow.*` (hosted editors; the editor closes them on `slotRemoved` before instances die),
   `Source/ui/PluginMenu.*` (native plug-in menu), `Source/ui/Footer.*`, `Source/PluginEditor.*`.

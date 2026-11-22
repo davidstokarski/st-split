@@ -6,9 +6,9 @@ namespace stsplit
 
 class BandRack;
 
-/** One hosted plug-in, drawn like a Logic insert slot: power (slot bypass), name, maker / format, latency; edit and
-    remove on hover. Click opens the plug-in's window, drag reorders (or moves it to the other band), right-click
-    for more. */
+/** One hosted plug-in: a grey hardware face (like the family's bar dropdowns) with power (slot bypass), name, maker /
+    format and latency; edit and remove on hover; a band-coloured bar underneath while its window is open.
+    Click opens the plug-in's window, drag reorders (or moves it to the other band), right-click for more. */
 class SlotRow : public juce::Component, public juce::SettableTooltipClient
 {
 public:
@@ -39,9 +39,10 @@ private:
 };
 
 //==============================================================================
-/** A band's channel strip: header (colour, name, range, M / S / on), kMaxSlots insert sockets (filled ones are
-    SlotRows; empty ones open the plug-in menu; the whole list is a drop target for slots from either rack), and a
-    column with the band's meter, Level and Mix. */
+/** A band's panel, ST Sat style: a glass bar with grey power / S / M buttons and the band's name sitting on its top
+    edge, the ordered plug-in slots with an "Add plug-in" well (drop target for slots from either panel), and a
+    ringed Level knob (band colour) next to a matte Mix knob. Its height follows the number of plug-ins
+    (getPreferredHeight); the editor anchors it at the bottom and eases it there. */
 class BandRack : public juce::Component, public juce::DragAndDropTarget, private ChainHost::Listener, private juce::Timer
 {
 public:
@@ -51,6 +52,7 @@ public:
     int getBand() const noexcept { return band; }
     void setSelected (bool);
     void setOpenEditors (const juce::StringArray& uids);
+    int getPreferredHeight() const;
 
     std::function<void (const juce::String& uid)> onOpenEditor;
     std::function<void (int band)> onSelected;
@@ -73,7 +75,8 @@ public:
 
     StSplitProcessor& getProcessor() noexcept { return proc; }
 
-    static constexpr int slotHeight = 28, slotGap = 4, headerHeight = 34;
+    static constexpr int edgeHeight = 12;                 // the top-edge buttons stick out this far above the bar
+    static constexpr int slotHeight = 26, slotGap = 4, knobAreaWidth = 196, minBarHeight = 140, titleHeight = 22;
 
 private:
     StSplitProcessor& proc;
@@ -84,14 +87,15 @@ private:
     float lastCrossover = -1.0f;
     juce::StringArray openEditors;
 
-    std::unique_ptr<style::Toggle> mute, solo, power;
+    std::unique_ptr<st::ToggleChip> power, solo, mute;
     std::unique_ptr<st::Knob> level, mix;
-    style::Meter meter;
     juce::OwnedArray<SlotRow> rows;
 
-    juce::Rectangle<int> header, list, side;
+    juce::Rectangle<float> box;
+    juce::Rectangle<int> list, knobs, title;   // title: band name + range, inside the bar above the slots
 
     juce::Rectangle<int> socketBounds (int index) const;
+    bool showsAddSocket() const;
     void rebuildRows();
     juce::String rangeText() const;
     int indexForY (float y) const;

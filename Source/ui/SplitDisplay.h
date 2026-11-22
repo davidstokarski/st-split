@@ -4,9 +4,10 @@
 namespace stsplit
 {
 
-/** Full-width split display: analyser, the bands' crossover responses in their colours, a dashed split line with
-    a grip (drag = frequency), one level line + pill handle per band (drag = band level), and a header per band
-    column naming its plug-in chain. Click a band to select it, double-click to add a plug-in to it. */
+/** Full-window split display in the ST Sat style: analyser, the selected band's column lit in its colour, the bands'
+    crossover responses, a dashed split line with a grip (drag = frequency), one level line + pill handle per band
+    (drag = band level) with the band's name and plug-in chain under it. Click a band to select it, double-click to
+    add a plug-in to it. */
 class SplitDisplay : public juce::Component, private ChainHost::Listener
 {
 public:
@@ -33,7 +34,7 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
-    static constexpr float headerHeight = 24.0f, handleTop = 60.0f, handleBottom = 196.0f;
+    static constexpr float handleTop = 104.0f, handleBottom = 290.0f;
 
 private:
     StSplitProcessor& proc;
@@ -76,14 +77,11 @@ private:
     void chainsChanged() override;
     void showBandMenu (int band);
 
-    void drawGrid (juce::Graphics&);
     void drawColumns (juce::Graphics&);
     void drawResponses (juce::Graphics&);
     void drawSpectrum (juce::Graphics&);
-    void drawScale (juce::Graphics&);
     void drawCrossovers (juce::Graphics&);
     void drawHandles (juce::Graphics&);
-    void drawBandHeaders (juce::Graphics&);
 };
 
 } // namespace stsplit

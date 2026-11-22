@@ -11,8 +11,8 @@ public:
     explicit StSplitEditor (StSplitProcessor&);
     ~StSplitEditor() override;
 
-    static constexpr int designWidth = 1040, designHeight = 720;
-    static constexpr int margin = 10, displayY = 52, displayHeight = 300, rackY = 362, rackHeight = 314, footerHeight = 36;
+    static constexpr int designWidth = 1040, designHeight = 690;
+    static constexpr int displayHeight = 486, footerHeight = 40, panelMargin = 14, panelGap = 14, panelsBottom = designHeight - footerHeight - 8;
 
     /** Opens (or brings to front) the window of a hosted plug-in. */
     void openPluginWindow (const juce::String& uid);
@@ -28,8 +28,12 @@ private:
     stsplit::FooterBar footer;
     std::map<juce::String, std::unique_ptr<stsplit::PluginWindow>> windows;
     int selectedBand = 0;
+    std::array<st::Animated, stsplit::kMaxBands> rackHeight;
+    juce::Image backdrop;
+    float backdropScale = 0.0f;
 
     void layout (juce::Rectangle<int> body) override;
+    void placeRacks (double dt);
     void paintBackground (juce::Graphics&, juce::Rectangle<int>) override;
     void updateOpenEditors();
     void slotRemoved (const juce::String& uid) override { closePluginWindow (uid); }

@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "ui/Style.h"
 
 using namespace stsplit;
 
@@ -14,33 +15,7 @@ StSplitProcessor::StSplitProcessor()
                      createParameterLayout()),
       chains (*this, apvts, undoManager)
 {
-    // ST Split identity: Logic Pro's dark appearance. Flat neutral greys, Logic's selection blue as the accent,
-    // and the bands in Logic's region colours (amber low, cyan high). See ui/Style.h for the surfaces built on these.
-    auto& theme = st::Theme::get();
-    theme.bg0 = juce::Colour (0xff181818);          // display well
-    theme.bg1 = juce::Colour (0xff1e1e1e);          // window
-    theme.bg2 = juce::Colour (0xff262626);          // panels
-    theme.bg3 = juce::Colour (0xff2e2e2e);          // panel headers, toolbar
-    theme.bg4 = juce::Colour (0xff3a3a3a);          // controls, filled slots
-    theme.stroke = juce::Colour (0xff383838);
-    theme.strokeSoft = juce::Colour (0xff121212);
-    theme.highlight = juce::Colour (0x0dffffff);
-    theme.displayTop = juce::Colour (0xff1e1e1e);
-    theme.displayGlow = juce::Colour (0xff2c2c2c);
-    theme.knobLight = juce::Colour (0xffa5a5a5);
-    theme.knobDark = juce::Colour (0xff5a5a5a);
-    theme.buttonTop = juce::Colour (0xff474747);
-    theme.buttonBottom = juce::Colour (0xff3d3d3d);
-    theme.glassPanel = juce::Colour (0xff262626);
-    theme.text = juce::Colour (0xffe6e6e6);
-    theme.textDim = juce::Colour (0xffa0a0a0);
-    theme.textFaint = juce::Colour (0xff6b6b6b);
-    theme.accent = juce::Colour (0xff1f7ae0);
-    theme.accent2 = juce::Colour (0xff4196f0);
-    theme.spectrum = juce::Colour (0xffb4b4b4);
-    theme.positive = juce::Colour (0xff30d158);
-    theme.warning = juce::Colour (0xfff2c443);
-    theme.danger = juce::Colour (0xffff453a);
+    stsplit::style::applyTheme();   // ST family look, ST Split colours (ui/Style.cpp)
 
     inGain.bind (apvts, ids::inputGain);
     outGain.bind (apvts, ids::outputGain);

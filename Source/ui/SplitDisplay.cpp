@@ -108,19 +108,19 @@ juce::Rectangle<float> SplitDisplay::handleBounds (int b) const
 {
     const auto xr = getBandXRange (b);
     // Keep the handle clear of the split grip when a band gets narrow.
-    const float cx = juce::jlimit (xr.getStart() + 36.0f, juce::jmax (xr.getStart() + 36.0f, xr.getEnd() - 36.0f), xr.getStart() + xr.getLength() * 0.5f);
-    return juce::Rectangle<float> (44.0f, 18.0f).withCentre ({ cx, handleY[(size_t) b].current });
+    const float cx = juce::jlimit (xr.getStart() + 46.0f, juce::jmax (xr.getStart() + 46.0f, xr.getEnd() - 46.0f), xr.getStart() + xr.getLength() * 0.5f);
+    return juce::Rectangle<float> (60.0f, 24.0f).withCentre ({ cx, handleY[(size_t) b].current });
 }
 
 juce::Rectangle<float> SplitDisplay::gripBounds (int i) const
 {
     const float x = xForHz (xoverPos[(size_t) i].current);
-    return juce::Rectangle<float> (22.0f, 28.0f).withCentre ({ x, handleTop + (handleBottom - handleTop) * 0.74f });
+    return juce::Rectangle<float> (26.0f, 30.0f).withCentre ({ x, handleTop + (handleBottom - handleTop) * 0.42f });
 }
 
 SplitDisplay::Hit SplitDisplay::hitTestAt (juce::Point<float> p) const
 {
-    if (! plot.contains (p)) return {};
+    if (! plot.contains (p) || p.y < 46.0f) return {};
 
     for (int b = 0; b < kMaxBands; ++b)
         if (handleBounds (b).expanded (4.0f).contains (p))
@@ -148,7 +148,7 @@ void SplitDisplay::resized()
 void SplitDisplay::rebuildResponses()
 {
     const auto& xo = proc.getEngine().getCrossover();
-    const float zeroY = plot.getBottom() - 116.0f, floorY = plot.getBottom() - 26.0f;
+    const float zeroY = plot.getBottom() - 150.0f, floorY = plot.getBottom() - 6.0f;
 
     for (int b = 0; b < kMaxBands; ++b)
     {
@@ -225,84 +225,78 @@ void SplitDisplay::frame (double dt)
 //==============================================================================
 void SplitDisplay::paint (juce::Graphics& g)
 {
-    juce::Path clip;
-    clip.addRoundedRectangle (plot, style::panelRadius);
-    g.saveState();
-    g.reduceClipRegion (clip);
-
-    style::well (g, plot);
-    drawGrid (g);
     drawColumns (g);
     drawResponses (g);
     drawSpectrum (g);
-    drawScale (g);
     drawCrossovers (g);
     drawHandles (g);
-    drawBandHeaders (g);
-
-    g.restoreState();
-    g.setColour (st::Theme::get().strokeSoft);
-    g.drawRoundedRectangle (plot.reduced (0.5f), style::panelRadius, 1.0f);
-}
-
-void SplitDisplay::drawGrid (juce::Graphics& g)
-{
-    const float top = plot.getY() + headerHeight, floorY = plot.getBottom() - 26.0f;
-
-    for (float decade : { 10.0f, 100.0f, 1000.0f, 10000.0f })
-        for (float m : { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f })
-        {
-            const float hz = decade * m;
-            if (hz < minHz || hz > maxHz) continue;
-            const bool major = m == 1.0f;
-            g.setColour (juce::Colours::white.withAlpha (major ? 0.075f : 0.03f));
-            g.fillRect (std::round (xForHz (hz)), top, 1.0f, floorY - top);
-        }
-
-    for (int i = 1; i <= 3; ++i)
-    {
-        g.setColour (juce::Colours::white.withAlpha (0.025f));
-        g.fillRect (plot.getX(), std::round (top + (floorY - top) * (float) i / 4.0f), plot.getWidth(), 1.0f);
-    }
-    g.setColour (juce::Colours::white.withAlpha (0.07f));
-    g.fillRect (plot.getX(), floorY, plot.getWidth(), 1.0f);
 }
 
 void SplitDisplay::drawColumns (juce::Graphics& g)
 {
+    // The selected band is lit from the top in its colour (ST Sat's band light), with soft inner edges.
     for (int b = 0; b < kMaxBands; ++b)
     {
         const float sel = selectAmt[(size_t) b].current, hov = hoverAmt[(size_t) b].current;
         if (sel + hov < 0.01f) continue;
+
+        const auto colour = getBandColour (b);
         const auto xr = getBandXRange (b);
-        g.setColour (getBandColour (b).withAlpha (0.045f * sel + 0.02f * hov));
-        g.fillRect (xr.getStart(), plot.getY() + headerHeight, xr.getLength(), plot.getHeight() - headerHeight);
+        auto col = juce::Rectangle<float> (xr.getStart(), plot.getY(), xr.getLength(), plot.getHeight());
+
+        juce::ColourGradient grad (colour.withAlpha (0.13f * sel + 0.035f * hov), 0.0f, plot.getY(),
+                                   colour.withAlpha (0.0f), 0.0f, plot.getBottom(), false);
+        grad.addColour (0.45, colour.withAlpha (0.045f * sel + 0.012f * hov));
+        g.setGradientFill (grad);
+        g.fillRect (col);
+
+        for (int side = 0; side < 2; ++side)
+        {
+            if ((side == 0 && b == 0) || (side == 1 && b == kMaxBands - 1)) continue;
+            // inner edge light, fading sideways into the band and downwards to nothing (no hard end)
+            const float x = side == 0 ? col.getX() : col.getRight() - 14.0f;
+            const float height = plot.getHeight() * 0.75f;
+            constexpr int slices = 16;
+            for (int k = 0; k < slices; ++k)
+            {
+                const float a = 0.10f * sel * (1.0f - (float) k / (float) slices);
+                juce::ColourGradient edge (colour.withAlpha (side == 0 ? a : 0.0f), x, 0.0f,
+                                           colour.withAlpha (side == 0 ? 0.0f : a), x + 14.0f, 0.0f, false);
+                g.setGradientFill (edge);
+                g.fillRect (x, plot.getY() + height * (float) k / (float) slices, 14.0f, height / (float) slices + 0.5f);
+            }
+        }
+
+        juce::ColourGradient topLine (colour.withAlpha (0.0f), col.getX(), 0.0f, colour.withAlpha (0.0f), col.getRight(), 0.0f, false);
+        topLine.addColour (0.5, colour.withAlpha (0.30f * sel));
+        g.setGradientFill (topLine);
+        g.fillRect (col.getX(), plot.getY(), col.getWidth(), 1.0f);
     }
 }
 
 void SplitDisplay::drawResponses (juce::Graphics& g)
 {
-    const float floorY = plot.getBottom() - 26.0f;
+    const float floorY = plot.getBottom() - 6.0f;
     for (int b = 0; b < kMaxBands; ++b)
     {
         const auto colour = getBandColour (b);
-        const float emphasis = 0.65f + 0.35f * juce::jmax (selectAmt[(size_t) b].current, hoverAmt[(size_t) b].current);
+        const float emphasis = 0.6f + 0.4f * juce::jmax (selectAmt[(size_t) b].current, hoverAmt[(size_t) b].current);
         const bool off = proc.apvts.getRawParameterValue (ids::band (b, "mute"))->load() > 0.5f;
 
         auto fill = responseCache[b];
         fill.lineTo (plot.getRight(), floorY);
         fill.lineTo (plot.getX(), floorY);
         fill.closeSubPath();
-        g.setGradientFill (juce::ColourGradient (colour.withAlpha ((off ? 0.04f : 0.16f) * emphasis), 0.0f, floorY - 90.0f,
+        g.setGradientFill (juce::ColourGradient (colour.withAlpha ((off ? 0.03f : 0.09f) * emphasis), 0.0f, floorY - 140.0f,
                                                  colour.withAlpha (0.0f), 0.0f, floorY, false));
         g.fillPath (fill);
 
-        // The stroke fades out towards the floor so the stop band never draws a flat line along the bottom.
-        const float a = (off ? 0.25f : 0.9f) * emphasis;
-        juce::ColourGradient stroke (colour.withAlpha (a), 0.0f, floorY - 92.0f, colour.withAlpha (0.0f), 0.0f, floorY - 2.0f, false);
+        // The stroke fades out towards the floor so the stop band never draws a line along the bottom.
+        const float a = (off ? 0.18f : 0.5f) * emphasis;
+        juce::ColourGradient stroke (colour.withAlpha (a), 0.0f, floorY - 140.0f, colour.withAlpha (0.0f), 0.0f, floorY - 4.0f, false);
         stroke.addColour (0.6, colour.withAlpha (a * 0.6f));
         g.setGradientFill (stroke);
-        g.strokePath (responseCache[b], juce::PathStrokeType (1.5f, juce::PathStrokeType::curved));
+        g.strokePath (responseCache[b], juce::PathStrokeType (1.4f, juce::PathStrokeType::curved));
     }
 }
 
@@ -310,48 +304,27 @@ void SplitDisplay::drawSpectrum (juce::Graphics& g)
 {
     if (analyzerMode == AnalyzerMode::off) return;
     const auto& t = st::Theme::get();
-    auto area = plot.withTrimmedTop (headerHeight + 6.0f).withTrimmedBottom (26.0f);
+    auto area = plot.withTrimmedTop (48.0f);
 
     if (analyzerMode == AnalyzerMode::preAndPost)
     {
         auto pre = preSpectrum.createPath (area, specMinDb, specMaxDb, minHz, maxHz, false);
-        g.setColour (t.textFaint.withAlpha (0.45f));
+        g.setGradientFill (juce::ColourGradient (t.textDim.withAlpha (0.25f), 0.0f, area.getY(),
+                                                 t.textDim.withAlpha (0.0f), 0.0f, area.getBottom() - 10.0f, false));
         g.strokePath (pre, juce::PathStrokeType (1.0f));
     }
 
     auto fill = postSpectrum.createPath (area, specMinDb, specMaxDb, minHz, maxHz, true);
-    g.setGradientFill (juce::ColourGradient (t.spectrum.withAlpha (0.10f), 0.0f, area.getY(),
-                                             t.spectrum.withAlpha (0.02f), 0.0f, area.getBottom(), false));
+    g.setGradientFill (juce::ColourGradient (t.spectrum.withAlpha (0.06f), 0.0f, area.getY(),
+                                             t.spectrum.withAlpha (0.0f), 0.0f, area.getBottom(), false));
     g.fillPath (fill);
 
     auto line = postSpectrum.createPath (area, specMinDb, specMaxDb, minHz, maxHz, false);
-    juce::ColourGradient lineGrad (t.spectrum.withAlpha (0.5f), 0.0f, area.getY(),
-                                   t.spectrum.withAlpha (0.0f), 0.0f, area.getBottom() - 2.0f, false);
-    lineGrad.addColour (0.75, t.spectrum.withAlpha (0.3f));
+    juce::ColourGradient lineGrad (t.spectrum.withAlpha (0.55f), 0.0f, area.getY(),
+                                   t.spectrum.withAlpha (0.0f), 0.0f, area.getBottom() - 4.0f, false);
+    lineGrad.addColour (0.7, t.spectrum.withAlpha (0.35f));
     g.setGradientFill (lineGrad);
-    g.strokePath (line, juce::PathStrokeType (1.0f, juce::PathStrokeType::curved));
-}
-
-void SplitDisplay::drawScale (juce::Graphics& g)
-{
-    // Ruler strip along the bottom (like Logic's bar ruler), drawn over the band tints.
-    const auto& t = st::Theme::get();
-    auto ruler = plot.withTop (plot.getBottom() - 26.0f);
-    g.setColour (t.bg1);
-    g.fillRect (ruler);
-    g.setColour (t.strokeSoft);
-    g.fillRect (ruler.getX(), ruler.getY(), ruler.getWidth(), 1.0f);
-    for (float hz : { 100.0f, 1000.0f, 10000.0f })
-    {
-        g.setColour (juce::Colours::white.withAlpha (0.12f));
-        g.fillRect (std::round (xForHz (hz)), ruler.getY() + 1.0f, 1.0f, 5.0f);
-    }
-    g.setFont (st::fonts::medium (10.0f));
-    g.setColour (t.textFaint);
-    const float y = plot.getBottom() - 13.0f;
-    for (float hz : { 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f })
-        g.drawText (hz >= 1000.0f ? juce::String ((int) (hz / 1000.0f)) + "k" : juce::String ((int) hz),
-                    juce::Rectangle<float> (40.0f, 14.0f).withCentre ({ xForHz (hz), y }), juce::Justification::centred, false);
+    g.strokePath (line, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved));
 }
 
 void SplitDisplay::drawCrossovers (juce::Graphics& g)
@@ -361,28 +334,50 @@ void SplitDisplay::drawCrossovers (juce::Graphics& g)
     for (int i = 0; i < kMaxCrossovers; ++i)
     {
         const float a = xoverHover[(size_t) i].current;
-        const bool dragging = drag.target == Target::crossover && drag.index == i;
         const auto grip = gripBounds (i);
-        const float x = std::round (grip.getCentreX()) + 0.5f;
+        const float x = grip.getCentreX();
+        const float top = plot.getY() + 46.0f, bottom = plot.getBottom() - 10.0f;
 
-        g.setColour (juce::Colours::white.withAlpha (0.30f + 0.35f * a));
-        g.drawVerticalLine ((int) x, plot.getY() + headerHeight, plot.getBottom() - 26.0f);
+        // dashed divider, faded at both ends
+        juce::Path line, dashed;
+        line.startNewSubPath (x, top);
+        line.lineTo (x, bottom);
+        const float dashes[] = { 4.0f, 4.0f };
+        juce::PathStrokeType (1.0f).createDashedStroke (dashed, line, dashes, 2);
+        const float alpha = 0.34f + 0.4f * a;
+        juce::ColourGradient fade (juce::Colours::white.withAlpha (0.0f), x, top, juce::Colours::white.withAlpha (0.0f), x, bottom, false);
+        fade.addColour (0.12, juce::Colours::white.withAlpha (alpha));
+        fade.addColour (0.75, juce::Colours::white.withAlpha (alpha));
+        g.setGradientFill (fade);
+        g.fillPath (dashed);
 
-        style::button (g, grip, a > 0.5f, dragging);
-        g.setColour (a > 0.5f ? t.text : t.textDim);
-        for (float dx : { -3.0f, 0.0f, 3.0f })
-            g.fillRect (grip.getCentreX() + dx - 0.5f, grip.getCentreY() - 6.0f, 1.0f, 12.0f);
+        // grip button with the family's "tent" glyph
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (grip.translated (0.0f, 1.5f), 4.0f);
+        g.setColour (t.bg4.withAlpha (0.95f).brighter (0.25f * a));
+        g.fillRoundedRectangle (grip, 4.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.drawRoundedRectangle (grip.reduced (0.5f), 4.0f, 1.0f);
 
+        juce::Path tent;
+        const auto c = grip.getCentre();
+        tent.startNewSubPath (c.x - 7.0f, c.y + 6.0f);
+        tent.quadraticTo (c.x - 3.0f, c.y + 5.0f, c.x, c.y - 7.0f);
+        tent.quadraticTo (c.x + 3.0f, c.y + 5.0f, c.x + 7.0f, c.y + 6.0f);
+        tent.startNewSubPath (c.x - 8.0f, c.y - 7.0f);
+        tent.lineTo (c.x + 8.0f, c.y - 7.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.75f + 0.25f * a));
+        g.strokePath (tent, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        // split frequency: a quiet label under the grip, a bubble while hovered / dragged
         const auto txt = st::params::formatHz (proc.getCrossover (i));
-        g.setFont (st::fonts::semibold (11.0f));
-        const float w = st::fonts::stringWidth (g.getCurrentFont(), txt) + 14.0f;
-        auto pill = juce::Rectangle<float> (w, 18.0f).withCentre ({ x, grip.getBottom() + 16.0f });
-        g.setColour (t.bg3.withAlpha (0.95f));
-        g.fillRoundedRectangle (pill, 3.0f);
-        g.setColour (t.strokeSoft);
-        g.drawRoundedRectangle (pill.reduced (0.5f), 3.0f, 1.0f);
-        g.setColour (t.text.withAlpha (0.75f + 0.25f * a));
-        g.drawText (txt, pill, juce::Justification::centred, false);
+        g.setFont (st::fonts::semibold (11.5f));
+        const float w = st::fonts::stringWidth (g.getCurrentFont(), txt) + 16.0f;
+        auto bubble = juce::Rectangle<float> (w, 20.0f).withCentre ({ x, grip.getBottom() + 17.0f });
+        g.setColour (t.bg0.withAlpha (0.85f * a));
+        g.fillRoundedRectangle (bubble, 4.0f);
+        g.setColour (t.text.withAlpha (0.6f + 0.4f * a));
+        g.drawText (txt, bubble, juce::Justification::centred, false);
     }
 }
 
@@ -395,67 +390,51 @@ void SplitDisplay::drawHandles (juce::Graphics& g)
         const auto i = (size_t) b;
         const float sel = selectAmt[i].current, hov = hoverAmt[i].current;
         const auto xr = getBandXRange (b);
-        const float y = std::round (handleY[i].current) + 0.5f;
+        const float y = handleY[i].current;
         const bool bypassed = proc.apvts.getRawParameterValue (ids::band (b, "bypass"))->load() > 0.5f;
         const bool muted = proc.apvts.getRawParameterValue (ids::band (b, "mute"))->load() > 0.5f;
-        const auto colour = getBandColour (b);
 
-        g.setColour (colour.withAlpha ((bypassed || muted ? 0.2f : 0.45f) + 0.3f * juce::jmax (sel, hov)));
-        g.drawHorizontalLine ((int) y, xr.getStart() + (b == 0 ? 0.0f : 1.0f), xr.getEnd() - (b == kMaxBands - 1 ? 0.0f : 1.0f));
+        // level line across the band (outer ends fade into the window edges)
+        {
+            const float a = (bypassed || muted ? 0.10f : 0.22f) + 0.22f * sel + 0.10f * hov;
+            const bool openLeft = b == 0, openRight = b == kMaxBands - 1;
+            juce::ColourGradient line (juce::Colours::white.withAlpha (openLeft ? 0.0f : a * 0.25f), xr.getStart(), y,
+                                       juce::Colours::white.withAlpha (openRight ? 0.0f : a * 0.25f), xr.getEnd(), y, false);
+            line.addColour (0.18, juce::Colours::white.withAlpha (a));
+            line.addColour (0.82, juce::Colours::white.withAlpha (a));
+            g.setGradientFill (line);
+            g.fillRect (xr.getStart() + 1.0f, y - 0.5f, xr.getLength() - 2.0f, 1.0f);
+        }
 
         auto hb = handleBounds (b);
         const bool active = drag.index == b && drag.target == Target::handle;
-        style::button (g, hb, hov > 0.5f, active, t.bg4.brighter (0.25f));
-        g.setColour (juce::Colour (0xff1a1a1a).withAlpha (0.6f));
-        for (float dx : { -4.0f, 0.0f, 4.0f })
-            g.fillRect (hb.getCentreX() + dx - 0.5f, hb.getCentreY() - 4.0f, 1.0f, 8.0f);
+        st::paint::pillHandle (g, hb, hov > 0.5f, active);
 
-        const float captionAlpha = juce::jmax (sel * 0.85f, hov, active ? 1.0f : 0.0f);
-        if (captionAlpha > 0.02f)
-        {
-            g.setFont (st::fonts::medium (11.0f));
-            g.setColour (t.text.withAlpha (0.8f * captionAlpha));
-            g.drawText ("Level " + proc.bandParam (b, "level").getCurrentValueAsText(),
-                        hb.withSizeKeepingCentre (160.0f, 16.0f).translated (0.0f, 20.0f), juce::Justification::centred, false);
-        }
+        // under the handle: band name (in its colour), then the chain, or the level while dragging
+        const auto colour = getBandColour (b);
+        const float strength = juce::jmax (0.55f, sel, hov);
+        auto text = hb.withSizeKeepingCentre (juce::jmax (120.0f, xr.getLength() - 24.0f), 16.0f).translated (0.0f, 23.0f);
+        const auto name = getBandName (b).toUpperCase();
+        g.setFont (st::fonts::caption (10.5f));
+        const float nameW = st::fonts::stringWidth (g.getCurrentFont(), name);
+        auto nameRow = text.withSizeKeepingCentre (nameW + 14.0f, 16.0f);
+        g.setColour (colour.withAlpha (strength));
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ nameRow.getX() + 3.0f, nameRow.getCentreY() }));
+        g.setColour (t.text.withAlpha (0.85f * strength));
+        g.drawText (name, nameRow.withTrimmedLeft (14.0f), juce::Justification::centredLeft, false);
+
+        g.setFont (st::fonts::medium (11.0f));
+        g.setColour (t.textDim.withAlpha (0.9f * strength));
+        g.drawFittedText (active ? "Level " + proc.bandParam (b, "level").getCurrentValueAsText() : chainSummary[i],
+                          text.translated (0.0f, 16.0f).toNearestInt(), juce::Justification::centred, 1, 0.9f);
 
         if (bypassed || muted)
         {
             g.setFont (st::fonts::caption (9.0f));
-            g.setColour (t.textDim);
-            g.drawText (bypassed ? "BYPASSED" : "MUTED", hb.withSizeKeepingCentre (90.0f, 14.0f).translated (0.0f, -20.0f),
+            g.setColour (t.textFaint);
+            g.drawText (bypassed ? "BYPASSED" : "MUTED", hb.withSizeKeepingCentre (90.0f, 14.0f).translated (0.0f, -22.0f),
                         juce::Justification::centred, false);
         }
-    }
-}
-
-void SplitDisplay::drawBandHeaders (juce::Graphics& g)
-{
-    // Logic region style: a coloured header strip per band naming its chain.
-    const auto& t = st::Theme::get();
-    for (int b = 0; b < kMaxBands; ++b)
-    {
-        const auto xr = getBandXRange (b);
-        auto strip = juce::Rectangle<float> (xr.getStart(), plot.getY(), xr.getLength(), headerHeight);
-        if (b > 0) strip.removeFromLeft (1.0f);
-        const float sel = selectAmt[(size_t) b].current;
-        const auto fill = t.bg0.interpolatedWith (getBandColour (b), 0.42f + 0.48f * sel);
-        g.setColour (fill);
-        g.fillRect (strip);
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.fillRect (strip.getX(), strip.getBottom() - 1.0f, strip.getWidth(), 1.0f);
-
-        auto text = strip.reduced (9.0f, 0.0f);
-        if (text.getWidth() < 24.0f) continue;
-        const auto fg = style::textOn (fill);
-        const auto name = getBandName (b).toUpperCase();
-        g.setFont (st::fonts::make (11.0f, st::fonts::Weight::bold, 0.06f));
-        const float nameW = juce::jmin (text.getWidth(), st::fonts::stringWidth (g.getCurrentFont(), name) + 10.0f);
-        g.setColour (fg);
-        g.drawText (name, text.removeFromLeft (nameW), juce::Justification::centredLeft, false);
-        g.setFont (st::fonts::medium (11.5f));
-        g.setColour (fg.withAlpha (0.8f));
-        g.drawText (chainSummary[(size_t) b], text, juce::Justification::centredLeft, true);
     }
 }
 

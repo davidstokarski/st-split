@@ -59,14 +59,9 @@ void FooterBar::paint (juce::Graphics& g)
 {
     const auto& t = st::Theme::get();
     auto r = getLocalBounds().toFloat();
-    style::strip (g, r, false);
+    style::paintTray (g, r);
     for (float x : dividers)
-    {
-        g.setColour (t.strokeSoft);
-        g.fillRect (x, r.getY() + 9.0f, 1.0f, r.getHeight() - 18.0f);
-        g.setColour (t.highlight);
-        g.fillRect (x + 1.0f, r.getY() + 9.0f, 1.0f, r.getHeight() - 18.0f);
-    }
+        st::paint::fadedLine (g, { x + 0.5f, r.getY() + 6.0f }, { x + 0.5f, r.getBottom() - 6.0f }, juce::Colours::white.withAlpha (0.10f), 1.0f, 0.5f);
 
     const double sr = proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 48000.0;
     const double ms = 1000.0 * juce::jmax (0, shownLatency) / sr;
