@@ -31,9 +31,15 @@ Plugin-specific notes:
   knobs with a ringed hero (Level, band colour), the footer tray. ST Split's identity is a cool slate near-black
   with amber (low) and cyan (high) light pools: tokens in `Source/ui/Style.cpp::applyTheme`, backdrop / tray / glass
   bar in `paintBackdrop` / `paintTray` / `paintGlassBar`. Compare new UI against the siblings' screenshots.
-- UI: `Source/ui/SplitDisplay.*` (display), `Source/ui/BandRack.*` (rack + slot rows, drag & drop between bands),
-  `Source/ui/PluginWindow.*` (hosted editors; the editor closes them on `slotRemoved` before instances die),
-  `Source/ui/PluginMenu.*` (native plug-in menu), `Source/ui/Footer.*`, `Source/PluginEditor.*`.
+- UX follows FabFilter Saturn / Pro-MB: everything is edited on the display. Band header with S / M that appear on
+  hover (hold = momentary, Cmd-click = exclusive); the split's frequency pill (drag, double-click types, Cmd-click
+  resets) with its slope button; level buttons (vertical = level, sideways = move the split, double-click types,
+  Cmd-click resets); one band panel that glides under the selected band. Plug-ins are compact Logic-style insert
+  slots inside each band's column (Option-click bypasses, Cmd-click removes, drag between bands).
+- UI: `Source/ui/SplitDisplay.*` (display + gestures), `Source/ui/InsertStack.*` (insert slots per band, drag & drop),
+  `Source/ui/BandPanel.*` (gliding band panel), `Source/ui/PluginWindow.*` (hosted editors; the editor closes them
+  on `slotRemoved` before instances die), `Source/ui/PluginMenu.*` (native plug-in menu), `Source/ui/Footer.*`,
+  `Source/PluginEditor.*` (places the stacks over their columns and glides the panel every frame).
 - Verify: `StSplitPluginTests` (engine null tests, Apple AU + ST Sat VST3 hosting, undo, state, A/B, block sizes),
   `StSplitPluginTests --snapshot <dir>` (look at the PNGs), `auval -v aufx Stsp StAu`.
 - Anything reusable belongs in st-shell, not here.

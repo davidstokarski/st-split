@@ -30,12 +30,11 @@ StSplitEditor::StSplitEditor (StSplitProcessor& p)
 
     for (int b = 0; b < kMaxBands; ++b)
     {
-        auto rack = std::make_unique<BandRack> (proc, b);
-        rack->onOpenEditor = [this] (const juce::String& uid) { openPluginWindow (uid); };
-        rack->onSelected = [this] (int band) { selectBand (band); };
-        rack->setBufferedToImage (true);
-        content.addAndMakeVisible (*rack);
-        racks[(size_t) b] = std::move (rack);
+        auto stack = std::make_unique<InsertStack> (proc, b);
+        stack->onOpenEditor = [this] (const juce::String& uid) { openPluginWindow (uid); };
+        stack->onSelected = [this] (int band) { selectBand (band); };
+        content.addAndMakeVisible (*stack);
+        stacks[(size_t) b] = std::move (stack);
     }
 
     content.addAndMakeVisible (footer);
@@ -43,12 +42,8 @@ StSplitEditor::StSplitEditor (StSplitProcessor& p)
     header.setBufferedToImage (true);
 
     display.onBandSelected = [this] (int b) { selectBand (b); };
-    display.onFrame = [this] (double dt) { placeRacks (dt); };
-    display.onAddPluginRequested = [this] (int b)
-    {
-        selectBand (b);
-        racks[(size_t) b]->showAddMenu (proc.getChains().getNumSlots (b), nullptr);
-    };
+    display.onFrame = [this] (double dt) { animate (dt); };
+    display.onAddPluginRequested = [this] (int b) { addPluginTo (b); };
 
     footer.onAnalyzerModeChanged = [this] (int m)
     {
@@ -57,6 +52,7 @@ StSplitEditor::StSplitEditor (StSplitProcessor& p)
     };
     footer.setAnalyzerMode ((int) proc.uiState.getProperty ("analyzer", 1));
 
+    panelFade.snap (1.0f);
     selectBand (juce::jlimit (0, kMaxBands - 1, (int) proc.uiState.getProperty ("selectedBand", 0)));
     proc.getChains().addListener (this);
 
@@ -70,13 +66,79 @@ StSplitEditor::~StSplitEditor()
     windows.clear();
 }
 
+void StSplitEditor::addPluginTo (int band)
+{
+    selectBand (band);
+    stacks[(size_t) band]->showAddMenu (proc.getChains().getNumSlots (band), nullptr);
+}
+
 void StSplitEditor::selectBand (int band)
 {
-    selectedBand = juce::jlimit (0, kMaxBands - 1, band);
+    band = juce::jlimit (0, kMaxBands - 1, band);
+    const bool changed = bandPanel == nullptr || bandPanel->getBand() != band;
+    selectedBand = band;
     proc.uiState.setProperty ("selectedBand", selectedBand, nullptr);
     display.setSelectedBand (selectedBand);
+    if (! changed) return;
+
+    // The band panel glides to the new band; the old one cross-fades out (ST Sat / Saturn).
+    const bool animateChange = bandPanel != nullptr;
+    if (animateChange)
+    {
+        outgoingPanel = std::move (bandPanel);
+        outgoingPanel->setInterceptsMouseClicks (false, false);
+        outgoingFade.snap (1.0f);
+    }
+
+    bandPanel = std::make_unique<BandPanel> (proc, band);
+    bandPanel->setBufferedToImage (true);
+    getContent().addAndMakeVisible (*bandPanel);
+    header.toFront (false);
+
+    if (animateChange) panelFade.snap (0.0f);
+    else { panelX.snap (targetPanelX()); panelFade.snap (1.0f); }
+    animate (0.0);
+}
+
+float StSplitEditor::targetPanelX() const
+{
+    const auto xr = display.getBandXRange (selectedBand);
+    const float w = (float) BandPanel::width;
+    return juce::jlimit (8.0f, (float) designWidth - 8.0f - w, xr.getStart() + xr.getLength() * 0.5f - w * 0.5f);
+}
+
+int StSplitEditor::panelY() const
+{
+    return juce::roundToInt ((float) display.getBottom() - SplitDisplay::scaleHeight) - BandPanel::height - 4;
+}
+
+void StSplitEditor::animate (double dt)
+{
+    // insert stacks ride in their band columns (following the split as it glides)
+    const int hovered = display.getHoveredBand();
     for (int b = 0; b < kMaxBands; ++b)
-        racks[(size_t) b]->setSelected (b == selectedBand);
+    {
+        auto& s = *stacks[(size_t) b];
+        s.setBounds (display.getStackArea (b, s.getPreferredHeight()) + display.getPosition());
+        s.setRevealed (b == hovered || b == selectedBand || s.isMouseOver (true));
+    }
+
+    if (bandPanel == nullptr) return;
+    panelX.setTarget (targetPanelX());
+    if (dt <= 0.0) panelX.snap (panelX.target);
+    else           panelX.tick (dt, 11.0f);
+    panelFade.setTarget (1.0f);
+    panelFade.tick (dt, 14.0f);
+    bandPanel->setBounds (juce::roundToInt (panelX.current), panelY() + juce::roundToInt ((1.0f - panelFade.current) * 8.0f),
+                          BandPanel::width, BandPanel::height);
+    bandPanel->setAlpha (panelFade.current);
+
+    if (outgoingPanel != nullptr)
+    {
+        outgoingFade.setTarget (0.0f);
+        if (! outgoingFade.tick (dt, 18.0f) || outgoingFade.current < 0.02f) outgoingPanel.reset();
+        else outgoingPanel->setAlpha (outgoingFade.current);
+    }
 }
 
 void StSplitEditor::openPluginWindow (const juce::String& uid)
@@ -121,7 +183,7 @@ void StSplitEditor::updateOpenEditors()
 {
     juce::StringArray open;
     for (auto& [uid, w] : windows) open.add (uid);
-    for (auto& r : racks) r->setOpenEditors (open);
+    for (auto& s : stacks) s->setOpenEditors (open);
 }
 
 void StSplitEditor::paintBackground (juce::Graphics& g, juce::Rectangle<int> area)
@@ -141,25 +203,10 @@ void StSplitEditor::paintBackground (juce::Graphics& g, juce::Rectangle<int> are
     g.drawImage (backdrop, area.toFloat(), juce::RectanglePlacement::stretchToFit);
 }
 
-void StSplitEditor::placeRacks (double dt)
-{
-    // Both band panels sit on a common baseline above the footer and grow upwards with their plug-in count.
-    const int w = (designWidth - 2 * panelMargin - (kMaxBands - 1) * panelGap) / kMaxBands;
-    for (int b = 0; b < kMaxBands; ++b)
-    {
-        auto& h = rackHeight[(size_t) b];
-        h.setTarget ((float) racks[(size_t) b]->getPreferredHeight());
-        if (dt <= 0.0) h.snap (h.target);
-        else h.tick (dt, 16.0f);
-        const int height = juce::roundToInt (h.current);
-        racks[(size_t) b]->setBounds (panelMargin + b * (w + panelGap), panelsBottom - height, w, height);
-    }
-}
-
 void StSplitEditor::layout (juce::Rectangle<int>)
 {
     auto all = getContent().getLocalBounds();
-    display.setBounds (all.withHeight (displayHeight));
     footer.setBounds (all.removeFromBottom (footerHeight));
-    placeRacks (0.0);
+    display.setBounds (all);
+    animate (0.0);
 }

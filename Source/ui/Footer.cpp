@@ -6,16 +6,12 @@ namespace stsplit
 
 FooterBar::FooterBar (StSplitProcessor& p)
     : proc (p),
-      slope (p.param (ids::slope), &p.undoManager),
       input (p.param (ids::inputGain), &p.undoManager, "In"),
       mix (p.param (ids::mix), &p.undoManager, "Mix"),
       output (p.param (ids::outputGain), &p.undoManager, "Out")
 {
-    slope.setFlatStyle (true);
-    slope.setCaption ("Slope");
     for (auto* n : { &input, &mix, &output }) n->setFlatStyle (true);
 
-    slope.setTooltip ("Steepness of the split (Linkwitz-Riley: the bands always sum back flat)");
     input.setTooltip ("Input gain (drag)");
     mix.setTooltip ("Global dry/wet of every band's plug-ins, latency compensated (drag)");
     output.setTooltip ("Output gain (drag)");
@@ -30,7 +26,7 @@ FooterBar::FooterBar (StSplitProcessor& p)
         st::showMenu (m, &analyzer, [safe = juce::Component::SafePointer<FooterBar> (this)] (int r) { if (safe != nullptr && r > 0) safe->setAnalyzerMode (r - 1); });
     };
 
-    for (juce::Component* c : { (juce::Component*) &slope, (juce::Component*) &analyzer,
+    for (juce::Component* c : { (juce::Component*) &analyzer,
                                 (juce::Component*) &input, (juce::Component*) &mix, (juce::Component*) &output })
         addAndMakeVisible (c);
 
@@ -81,8 +77,6 @@ void FooterBar::resized()
     dividers.clear();
     auto divide = [this, &r] { dividers.push_back ((float) r.getX() + 10.0f); r.removeFromLeft (20); };
 
-    slope.setBounds (r.removeFromLeft (150));
-    divide();
     analyzer.setBounds (r.removeFromLeft (128));
     divide();
     latencyArea = r.removeFromLeft (140);

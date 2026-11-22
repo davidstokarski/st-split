@@ -4,7 +4,8 @@
 namespace stsplit
 {
 
-/** Bottom tray: split slope, analyser and the chain latency on the left; In / Mix / Out on the right. */
+/** Bottom tray: analyser and the total chain latency on the left; In / Mix / Out on the right. (The split's slope
+    lives on the split itself, in the display.) */
 class FooterBar : public juce::Component, private juce::Timer
 {
 public:
@@ -17,7 +18,6 @@ public:
 
 private:
     StSplitProcessor& proc;
-    st::Dropdown slope;
     st::FlatButton analyzer { "", "Spectrum analyser" };
     st::NumberBox input, mix, output;
     int analyzerMode = 1, shownLatency = -1;
