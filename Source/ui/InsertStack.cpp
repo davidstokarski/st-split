@@ -1,5 +1,5 @@
 #include "InsertStack.h"
-#include "PluginMenu.h"
+#include "PluginBrowser.h"
 
 namespace stsplit
 {
@@ -152,12 +152,12 @@ void InsertSlot::showContextMenu()
         if (other != band)
             m.addItem ("Move to " + getBandName (other) + " band", chains.canAdd (other), false,
                        [&chains, uid, other, safe] { if (safe != nullptr) chains.moveSlot (uid, other, kMaxSlots); });
-    juce::PopupMenu replace;
-    addPluginItems (replace, chains.getCatalog(), [&chains, uid, safe] (const juce::PluginDescription& d)
+    m.addItem ("Replace with" + ellipsis(), [self = juce::Component::SafePointer<InsertSlot> (this), &chains, uid, safe, name = info.name]
     {
-        if (safe != nullptr) chains.replacePlugin (uid, d);
+        if (safe == nullptr || self == nullptr) return;
+        PluginBrowser::show (*self, self->getLocalBounds(), chains.getCatalog(), "Replace", name,
+                             [&chains, uid, safe] (const juce::PluginDescription& d) { if (safe != nullptr) chains.replacePlugin (uid, d); });
     });
-    m.addSubMenu ("Replace with", replace);
     m.addSeparator();
     m.addItem ("Remove", [&chains, uid, safe] { if (safe != nullptr) chains.removeSlot (uid); });
     st::showMenu (m, nullptr, {}, true);
@@ -218,7 +218,13 @@ void InsertStack::showAddMenu (int index, juce::Component* target)
 {
     if (! proc.getChains().canAdd (band)) return;
     auto safe = juce::Component::SafePointer<InsertStack> (this);
-    showPluginMenu (proc.getChains().getCatalog(), target, [safe, index] (const juce::PluginDescription& d)
+    const auto lo = band > 0 ? st::params::formatHz (proc.getCrossover (band - 1)) : juce::String();
+    const auto hi = band < kMaxBands - 1 ? st::params::formatHz (proc.getCrossover (band)) : juce::String();
+    auto& anchor = target != nullptr ? *target : *static_cast<juce::Component*> (this);
+    const auto area = target != nullptr ? target->getLocalBounds() : slotBounds (juce::jmin (slots.size(), kMaxSlots - 1));
+    PluginBrowser::show (anchor, area, proc.getChains().getCatalog(), "Add to " + getBandName (band),
+                         lo.isEmpty() ? "below " + hi : hi.isEmpty() ? "above " + lo : lo + " - " + hi,
+                         [safe, index] (const juce::PluginDescription& d)
     {
         if (auto* self = safe.getComponent())
         {
@@ -226,7 +232,7 @@ void InsertStack::showAddMenu (int index, juce::Component* target)
             if (uid.isNotEmpty() && self->onOpenEditor && self->proc.getChains().getInstance (uid) != nullptr)
                 self->onOpenEditor (uid);
         }
-    }, target == nullptr, "Add to " + getBandName (band));
+    });
 }
 
 juce::Rectangle<int> InsertStack::slotBounds (int index) const

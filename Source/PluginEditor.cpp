@@ -1,5 +1,4 @@
 #include "PluginEditor.h"
-#include "ui/PluginMenu.h"
 #include "ui/Style.h"
 
 using namespace stsplit;

@@ -1,6 +1,7 @@
 // Whole-plugin tests (engine alignment, hosting Apple's built-in Audio Units, state, stress) and editor snapshots.
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "ui/PluginBrowser.h"
 
 using namespace stsplit;
 
@@ -214,6 +215,33 @@ static int runTests()
     }
     check (! selfListed, "ST Split never offers itself");
     if (! (delay && dist && limiter && eq)) { std::cout << failures << " FAILURES\n"; return 1; }
+
+    // ---- Plug-in browser search
+    std::cout << "Plug-in browser\n";
+    {
+        auto mk = [] (const char* n, const char* m, const char* f)
+        {
+            juce::PluginDescription d;
+            d.name = n; d.manufacturerName = m; d.pluginFormatName = f;
+            return d;
+        };
+        const std::vector<juce::PluginDescription> fx { mk ("Pro-C 2", "FabFilter", "VST3"), mk ("Pro-Q 3", "FabFilter", "AudioUnit"),
+                                                       mk ("Saturn 2", "FabFilter", "VST3"), mk ("Decapitator", "Soundtoys", "AudioUnit"),
+                                                       mk ("CompIQ", "Zeta", "VST3") };
+        auto names = [] (const std::vector<PluginBrowser::Row>& rows)
+        {
+            juce::StringArray a;
+            for (auto& r : rows) a.add (r.isHeader ? "#" + r.header : r.desc.name);
+            return a.joinIntoString ("|");
+        };
+        check (names (PluginBrowser::buildRows (fx, { fx[3] }, "")) == "#Recent|Decapitator|#FabFilter|Pro-C 2|Pro-Q 3|Saturn 2|#Soundtoys|Decapitator|#Zeta|CompIQ",
+               "empty search: Recent, then grouped by maker");
+        check (names (PluginBrowser::buildRows (fx, {}, "pro")) == "Pro-C 2|Pro-Q 3", "name search");
+        check (names (PluginBrowser::buildRows (fx, {}, "fabfilter sat")) == "Saturn 2", "every word must match (maker + name)");
+        check (names (PluginBrowser::buildRows (fx, {}, "AU")) == "Decapitator|Pro-Q 3", "format search (ties sort by name)");
+        check (names (PluginBrowser::buildRows (fx, {}, "2")) == "Pro-C 2|Saturn 2", "names whose word starts with the query rank first");
+        check (PluginBrowser::buildRows (fx, {}, "zzz").empty(), "no match -> no rows");
+    }
 
     // ---- VST3 scanning happens out of process: a plug-in that crashes while being opened can't take us down.
     std::cout << "Out-of-process VST3 scan\n";
@@ -570,6 +598,15 @@ struct SnapshotApp : juce::JUCEApplicationBase
             auto& l = p.bandParam (1, "level");
             l.setValueNotifyingHost (l.convertTo0to1 (-9.0f));
         }, "04_solo_low" });
+        snap->jobs.push_back ({ [&p]
+        {
+            p.bandParam (0, "solo").setValueNotifyingHost (0.0f);
+            p.uiState.setProperty ("selectedBand", 1, nullptr);
+        }, "05_plugin_browser", 1.0f, [] (StSplitEditor& e)
+        {
+            e.getStack (1).showAddMenu (3, nullptr);
+            if (auto* b = PluginBrowser::getOpen()) b->setQuery ("AU");
+        } });
         snap->startTimerHz (60);
     }
 };
