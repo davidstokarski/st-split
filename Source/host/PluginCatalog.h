@@ -13,7 +13,7 @@ namespace stsplit
       (<plug-in bundle>/Contents/Helpers). A plug-in that crashes or hangs while being opened only takes the helper
       down and is skipped from then on; nothing unknown is ever loaded into the DAW just to list it. Without the
       helper there is no VST3 scan at all (never an in-process fallback). Results are cached in
-      ~/Library/Application Support/ST Audio/ST Split/.
+      ~/Library/Application Support/Stokarski Studios/ST Split/.
     - ST Split itself is never offered (no recursion).
 
     All public functions are message-thread only unless noted. Listen with ChangeListener for scan progress. */

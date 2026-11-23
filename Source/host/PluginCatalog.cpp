@@ -1,5 +1,7 @@
 #include "PluginCatalog.h"
 
+#include <mutex>
+
 namespace stsplit
 {
 
@@ -86,6 +88,9 @@ PluginCatalog::PluginCatalog() : juce::Thread ("ST Split plug-in scan")
 
     if (auto xml = juce::XmlDocument::parse (vst3CacheFile()))
         vst3List.recreateFromXml (*xml);
+    // ST plug-ins scanned before the rename to Stokarski Studios: forget them so the next scan lists the new name
+    for (const auto& d : vst3List.getTypes())
+        if (d.manufacturerName == st::kLegacyCompanyName) vst3List.removeType (d);
     loadSettings();
 
     audioUnits = listAudioUnitEffects();
@@ -98,13 +103,17 @@ PluginCatalog::~PluginCatalog()
 
 juce::File PluginCatalog::getDataDirectory()
 {
-    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-               .getChildFile ("Application Support").getChildFile ("ST Audio").getChildFile ("ST Split");
+    const auto support = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Application Support");
+    const auto dir = support.getChildFile (st::kCompanyName).getChildFile ("ST Split");
+    static std::once_flag moved;   // the cache from before the rename to Stokarski Studios
+    std::call_once (moved, [&] { st::adoptLegacyFolder (dir, support.getChildFile (st::kLegacyCompanyName).getChildFile ("ST Split")); });
+    return dir;
 }
 
 bool PluginCatalog::isSelf (const juce::PluginDescription& d)
 {
-    return d.name.equalsIgnoreCase ("ST Split") && d.manufacturerName.equalsIgnoreCase ("ST Audio");
+    return d.name.equalsIgnoreCase ("ST Split")
+        && (d.manufacturerName.equalsIgnoreCase (st::kCompanyName) || d.manufacturerName.equalsIgnoreCase (st::kLegacyCompanyName));
 }
 
 juce::String PluginCatalog::shortFormatName (const juce::PluginDescription& d)
