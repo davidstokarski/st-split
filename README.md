@@ -6,6 +6,18 @@ Split a track at any frequency and run **your own plug-ins** on each side: a com
 
 ![ST Split](docs/screenshot.png)
 
+## Download
+
+**[⬇ Download ST Split for macOS (VST3 + AU)](https://github.com/davidstokarski/st-split/releases/latest/download/ST-Split-macOS.zip)**
+— or pick a version on the [Releases page](https://github.com/davidstokarski/st-split/releases).
+
+1. Copy `ST Split.vst3` to `~/Library/Audio/Plug-Ins/VST3/` and `ST Split.component` to `~/Library/Audio/Plug-Ins/Components/`
+2. The builds are ad-hoc signed (not notarised). If macOS blocks them, run once:
+   ```bash
+   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/"ST Split.vst3" ~/Library/Audio/Plug-Ins/Components/"ST Split.component"
+   ```
+3. Restart your DAW.
+
 ## Features
 
 - Phase-coherent Linkwitz–Riley split (12 / 24 / 48 dB/oct): with nothing loaded the bands sum back to the input
