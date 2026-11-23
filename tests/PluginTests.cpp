@@ -613,9 +613,13 @@ struct SnapshotApp : juce::JUCEApplicationBase
 
 static juce::JUCEApplicationBase* createSnapshotApp() { return new SnapshotApp(); }
 
+int runVideoRender (int argc, char** argv);   // VideoRender.cpp
+
 int main (int argc, char** argv)
 {
     juce::StringArray args (argv + 1, argc - 1);
+    if (args.contains ("--video"))
+        return runVideoRender (argc, argv);
     if (args.contains ("--snapshot"))
     {
         snapshotDir = juce::File (args[args.indexOf ("--snapshot") + 1]);

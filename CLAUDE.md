@@ -42,4 +42,6 @@ Plugin-specific notes:
   `Source/PluginEditor.*` (places the stacks over their columns and glides the panel every frame).
 - Verify: `StSplitPluginTests` (engine null tests, Apple AU + ST Sat VST3 hosting, undo, state, A/B, block sizes),
   `StSplitPluginTests --snapshot <dir>` (look at the PNGs), `auval -v aufx Stsp StAu`.
+  Website videos: `StSplitPluginTests --video <dir> [scene ...]` (`tests/VideoRender.cpp`, on the shell's
+  `st_shell/testing/st_video.h`; hosts Apple's AUs): scenes distort-highs, delay-top.
 - Anything reusable belongs in st-shell, not here.

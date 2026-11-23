@@ -1,8 +1,8 @@
 # Whole-plugin tests: engine alignment, hosting (Apple's built-in AUs), state, stress + editor snapshots (PNG).
-#   StSplitPluginTests [--snapshot <dir>]
+#   StSplitPluginTests [--snapshot <dir>] [--video <dir> [scene ...]]
 # Links the plugin's shared-code library, so it exercises the real processor.
 juce_add_console_app(StSplitPluginTests PRODUCT_NAME "StSplitPluginTests")
-target_sources(StSplitPluginTests PRIVATE PluginTests.cpp)
+target_sources(StSplitPluginTests PRIVATE PluginTests.cpp VideoRender.cpp)
 target_compile_features(StSplitPluginTests PRIVATE cxx_std_20)
 target_link_libraries(StSplitPluginTests PRIVATE STSplit)
 target_include_directories(StSplitPluginTests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../Source")
