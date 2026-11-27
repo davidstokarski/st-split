@@ -61,3 +61,7 @@ cmake -S . -B build -DSTSPLIT_BUILD_TESTS=ON && cmake --build build
 The tests host Apple's built-in Audio Units (always installed) and, when present, the ST Sat VST3.
 
 Release (universal build → zip with the .vst3 and .component): `scripts/release.sh` (see st-shell `docs/RELEASING.md`).
+
+## Contributing
+
+See the shared [contributor notes](https://github.com/davidstokarski/st-shell/blob/main/CONTRIBUTING.md) in ST Shell. All PRs to `main` need approval from @davidstokarski.
